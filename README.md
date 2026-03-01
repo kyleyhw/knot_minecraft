@@ -4,27 +4,52 @@ A set of bash scripts to run a Minecraft Java Edition server on AWS with minimal
 
 ## Architecture
 
+```mermaid
+graph TB
+    subgraph AWS["AWS eu-west-2 (London)"]
+        subgraph EC2["EC2 Spot Instance — m7i-flex.large"]
+            Java["Java 21"]
+            MC["Minecraft Server (screen session)"]
+            Java --> MC
+        end
+
+        subgraph EBS["EBS Volume 10GB (gp3)"]
+            world["/opt/minecraft/server/world/"]
+            props["server.properties"]
+            ops["ops.json"]
+            jar["server.jar"]
+        end
+
+        subgraph SG["Security Group"]
+            port1["TCP 25565 — Minecraft"]
+            port2["TCP 22 — SSH"]
+        end
+
+        EC2 -->|mount| EBS
+        SG -->|protects| EC2
+    end
+
+    Players["Players"] -->|connect| port1
+    Admin["Admin (SSH)"] -->|manage| port2
 ```
-┌─────────────────────────────────────────────────┐
-│  AWS eu-west-2 (London)                         │
-│                                                 │
-│  ┌───────────────────┐    ┌──────────────────┐  │
-│  │  EC2 Spot Instance │◄──│  EBS Volume 10GB │  │
-│  │  m7i-flex.large    │   │  (gp3)           │  │
-│  │  8GB RAM, 2 vCPU   │   │                  │  │
-│  │                    │   │  /opt/minecraft/  │  │
-│  │  Java 21           │   │  ├── server/      │  │
-│  │  Minecraft Server  │   │  │   ├── world/   │  │
-│  │  (screen session)  │   │  │   ├── ops.json │  │
-│  └────────┬───────────┘   │  │   └── ...      │  │
-│           │               └──┘                │  │
-│           │                                   │  │
-│  ┌────────▼───────────┐                       │  │
-│  │  Security Group     │                       │  │
-│  │  TCP 25565 (MC)     │                       │  │
-│  │  TCP 22    (SSH)    │                       │  │
-│  └─────────────────────┘                       │  │
-└─────────────────────────────────────────────────┘
+
+```mermaid
+graph LR
+    subgraph start ["bash infra/start.sh"]
+        direction LR
+        S1["Launch spot instance"] --> S2["Attach EBS volume"]
+        S2 --> S3["Install Java 21"]
+        S3 --> S4["Start Minecraft"]
+    end
+
+    subgraph stop ["bash infra/stop.sh"]
+        direction LR
+        T1["Send 'stop' command"] --> T2["Wait for world save"]
+        T2 --> T3["Detach EBS volume"]
+        T3 --> T4["Terminate instance"]
+    end
+
+    start --> stop
 ```
 
 **How it works:** When you run `start.sh`, a cheap spot instance launches in London, the persistent EBS volume (containing your world data) is attached, Java and Minecraft are installed if needed, and the server starts. When you run `stop.sh`, the Minecraft server saves the world, the EBS volume is safely detached, and the instance is terminated. You only pay for compute while you're actually playing.
