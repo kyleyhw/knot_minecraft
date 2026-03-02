@@ -1,3 +1,5 @@
 .env
 *.pem
 server/
+.idea/
+.claude/
