@@ -31,6 +31,7 @@ graph LR
 │   ├── restore.sh           # manual restore
 │   └── teardown.sh          # destroy AWS resources
 ├── local-start.sh           # host locally
+├── reset.sh                 # delete world and start fresh
 └── .gitattributes           # Git LFS tracking
 ```
 
