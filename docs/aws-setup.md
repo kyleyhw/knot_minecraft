@@ -28,6 +28,20 @@ This creates:
 
 No EBS volume is created — `start.sh` handles that on demand.
 
+The `.env` file looks like this:
+
+```bash
+export AWS_PROFILE=minecraft
+REGION=eu-west-2
+AZ=eu-west-2a
+KEY_NAME=minecraft-server-key
+SG_ID=sg-0abc1234def56789a
+VOLUME_ID=
+INSTANCE_ID=
+```
+
+`VOLUME_ID` and `INSTANCE_ID` are populated automatically by `start.sh` and cleared by `stop.sh`.
+
 ## Start the server
 
 ```bash
@@ -106,3 +120,47 @@ bash infra/teardown.sh
 **Permanently deletes** the security group, key pair, and any running instance/volume. Prompts for confirmation.
 
 After teardown, you can run `setup.sh` again to start fresh.
+
+## Changing region or instance type
+
+The region and availability zone are set at the top of `infra/setup.sh`:
+
+```bash
+REGION="eu-west-2"
+AZ="${REGION}a"
+```
+
+To use a different region, change these values **before** running `setup.sh`. The instance type (`c7i-flex.large`) is set in `infra/start.sh` — change the `--instance-type` argument if you want a different size.
+
+If you've already run setup in one region, run `teardown.sh` first before setting up in a new region.
+
+## Troubleshooting
+
+### Spot request capacity errors
+
+```
+Error: InsufficientInstanceCapacity — no spot capacity available
+```
+
+AWS doesn't have spare capacity for the requested instance type in that region. Options:
+- Wait a few minutes and try again
+- Change the instance type in `start.sh` (e.g., `m7i-flex.large` or `c6i.large`)
+- Change the region in `setup.sh` and `.env` (run teardown first)
+
+### SSH connection timeout
+
+If `start.sh` prints "WARNING: Timed out waiting for SSH":
+- The instance may still be booting — wait a minute, then SSH manually
+- Check that your IP isn't blocked by a corporate firewall on port 22
+- Run `bash infra/status.sh` to confirm the instance is running
+
+### Volume still attached after failed stop
+
+If `start.sh` fails because the volume already exists:
+1. Run `bash infra/status.sh` to check if an instance is running
+2. If not, manually delete the orphaned volume:
+   ```bash
+   aws ec2 delete-volume --region eu-west-2 --volume-id <VOLUME_ID>
+   ```
+3. Clear the volume ID in `infra/.env` (set `VOLUME_ID=`)
+4. Run `start.sh` again

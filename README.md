@@ -15,6 +15,25 @@ graph LR
     E -->|next session| B
 ```
 
+## Repo layout
+
+```
+.
+├── backups/
+│   └── world.tar.gz        # world backup (Git LFS)
+├── docs/                    # detailed guides
+├── infra/                   # AWS hosting scripts
+│   ├── setup.sh             # one-time AWS setup
+│   ├── start.sh             # launch server
+│   ├── stop.sh              # stop + backup + teardown
+│   ├── status.sh            # check server state
+│   ├── backup.sh            # manual backup
+│   ├── restore.sh           # manual restore
+│   └── teardown.sh          # destroy AWS resources
+├── local-start.sh           # host locally
+└── .gitattributes           # Git LFS tracking
+```
+
 ## Quickstart: Host locally
 
 No AWS account needed. Requires Java 21+.
@@ -47,6 +66,19 @@ After stopping, commit the backup:
 ```bash
 git add backups/ && git commit -m "Update world backup" && git push
 ```
+
+## Connecting to the server
+
+Once the server is running, players connect in Minecraft:
+
+1. Open Minecraft Java Edition
+2. Go to **Multiplayer** > **Add Server**
+3. Enter the server address:
+   - **Local:** `localhost:25565` (same machine) or `<host-ip>:25565` (LAN)
+   - **AWS:** the public IP printed by `start.sh` (e.g., `3.10.45.12:25565`)
+4. Click **Done**, then select the server and click **Join Server**
+
+For friends outside your local network, see [Sharing](docs/sharing.md) for IP finding and port forwarding.
 
 ## Features
 

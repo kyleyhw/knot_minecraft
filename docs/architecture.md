@@ -95,3 +95,28 @@ Spot instances use AWS's spare EC2 capacity at a ~60-70% discount. The c7i-flex.
 The tradeoff is that AWS can reclaim the instance with 2 minutes' notice. In practice this is rare for the instance types and regions used here. If it happens, you lose any progress since the last backup — but the world backup in Git is always safe.
 
 `stop.sh` always backs up the world before shutting down, so normal usage is unaffected.
+
+## What's in the backup
+
+`backups/world.tar.gz` is a tarball of the entire `server/` directory. It contains:
+
+- `server.jar` — the Minecraft server binary
+- `world/` — the world data (terrain, player data, entities)
+- `server.properties` — all server settings
+- `ops.json` — operator list
+- `whitelist.json` — whitelist (if enabled)
+- `banned-players.json`, `banned-ips.json` — ban lists
+- `eula.txt` — the accepted EULA
+
+This means your settings, OP list, and bans all persist across sessions automatically. When `start.sh` restores from backup, the server picks up exactly where it left off.
+
+## Why Git LFS
+
+The world backup is a large binary file (typically 50-500 MB) that changes every session. Git is designed for text files and stores every version of every file — storing large binaries directly would bloat the repository quickly.
+
+Git LFS (Large File Storage) solves this by storing large files on a separate server and only keeping lightweight pointers in the git repo. The `.gitattributes` file tells git to track `backups/*.tar.gz` with LFS.
+
+Key commands:
+- `git lfs pull` — download the actual backup file (needed after cloning)
+- `git lfs install` — one-time setup if LFS isn't configured on your machine
+- `git push` — automatically uploads the new backup to LFS when you push
