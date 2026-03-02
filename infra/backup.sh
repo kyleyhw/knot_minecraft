@@ -60,6 +60,14 @@ $SSH_CMD "sudo rm -f /tmp/world.tar.gz"
 echo "Restarting Minecraft..."
 $SSH_CMD "cd /opt/minecraft/server && sudo screen -dmS minecraft java -Xmx3G -Xms3G -jar server.jar nogui"
 
+# Strip privacy-sensitive files from backup
+echo "Stripping usercache and logs..."
+TMPDIR=$(mktemp -d)
+(cd "$TMPDIR" && tar xzf "$BACKUP_DIR/world.tar.gz" \
+    && rm -f server/usercache.json && rm -rf server/logs \
+    && tar czf "$BACKUP_DIR/world.tar.gz" server/)
+rm -rf "$TMPDIR"
+
 BACKUP_SIZE=$(du -h "$BACKUP_DIR/world.tar.gz" | cut -f1)
 echo ""
 echo "=== Backup complete ==="

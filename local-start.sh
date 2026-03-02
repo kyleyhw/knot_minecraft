@@ -73,6 +73,14 @@ mkdir -p "$SCRIPT_DIR/backups"
 cd "$SCRIPT_DIR"
 tar czf "$BACKUP_FILE" server/
 
+# Strip privacy-sensitive files from backup
+echo "Stripping usercache and logs..."
+TMPDIR=$(mktemp -d)
+(cd "$TMPDIR" && tar xzf "$BACKUP_FILE" \
+    && rm -f server/usercache.json && rm -rf server/logs \
+    && tar czf "$BACKUP_FILE" server/)
+rm -rf "$TMPDIR"
+
 BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
 echo "Backup saved: backups/world.tar.gz ($BACKUP_SIZE)"
 echo ""

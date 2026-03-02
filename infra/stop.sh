@@ -62,6 +62,14 @@ scp -i "${SCRIPT_DIR}/${KEY_NAME}.pem" $SSH_OPTS \
     "ec2-user@$PUBLIC_IP:/tmp/world.tar.gz" \
     "$BACKUP_DIR/world.tar.gz"
 
+# Strip privacy-sensitive files from backup
+echo "  Stripping usercache and logs..."
+TMPDIR=$(mktemp -d)
+(cd "$TMPDIR" && tar xzf "$BACKUP_DIR/world.tar.gz" \
+    && rm -f server/usercache.json && rm -rf server/logs \
+    && tar czf "$BACKUP_DIR/world.tar.gz" server/)
+rm -rf "$TMPDIR"
+
 BACKUP_SIZE=$(du -h "$BACKUP_DIR/world.tar.gz" | cut -f1)
 echo "  Backup saved: backups/world.tar.gz ($BACKUP_SIZE)"
 
