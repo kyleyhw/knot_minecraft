@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="$(cd "$(dirname "$0")" && pwd)/.env"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
 REGION="eu-west-2"
 AZ="${REGION}a"
 KEY_NAME="minecraft-server-key"
@@ -23,8 +25,8 @@ aws ec2 create-key-pair \
     --region "$REGION" \
     --key-name "$KEY_NAME" \
     --query 'KeyMaterial' \
-    --output text > "${KEY_NAME}.pem"
-chmod 400 "${KEY_NAME}.pem"
+    --output text > "${REPO_DIR}/${KEY_NAME}.pem"
+chmod 400 "${REPO_DIR}/${KEY_NAME}.pem"
 echo "  Saved private key to ${KEY_NAME}.pem"
 
 # --- Security Group ---

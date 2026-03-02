@@ -152,7 +152,7 @@ if [[ -f "$BACKUP_FILE" ]]; then
     echo ""
     echo "Backup found — restoring world..."
 
-    SSH_CMD="ssh -i ${SCRIPT_DIR}/${KEY_NAME}.pem $SSH_OPTS ec2-user@$PUBLIC_IP"
+    SSH_CMD="ssh -i ${REPO_DIR}/${KEY_NAME}.pem $SSH_OPTS ec2-user@$PUBLIC_IP"
 
     # Wait for SSH to be ready
     echo "  Waiting for SSH..."
@@ -189,7 +189,7 @@ if [[ -f "$BACKUP_FILE" ]]; then
 
     # Upload and extract backup
     echo "  Uploading backup..."
-    scp -i "${SCRIPT_DIR}/${KEY_NAME}.pem" $SSH_OPTS \
+    scp -i "${REPO_DIR}/${KEY_NAME}.pem" $SSH_OPTS \
         "$BACKUP_FILE" \
         "ec2-user@$PUBLIC_IP:/tmp/world.tar.gz"
 

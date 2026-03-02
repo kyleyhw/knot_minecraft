@@ -3,6 +3,7 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -69,7 +70,7 @@ aws ec2 delete-security-group --region "$REGION" --group-id "$SG_ID" 2>/dev/null
 # --- Delete key pair and local PEM ---
 echo "Deleting key pair $KEY_NAME..."
 aws ec2 delete-key-pair --region "$REGION" --key-name "$KEY_NAME" 2>/dev/null || true
-rm -f "${SCRIPT_DIR}/${KEY_NAME}.pem"
+rm -f "${REPO_DIR}/${KEY_NAME}.pem"
 
 # --- Clean up .env ---
 rm -f "$ENV_FILE"

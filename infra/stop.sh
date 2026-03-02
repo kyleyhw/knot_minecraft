@@ -42,7 +42,7 @@ PUBLIC_IP=$(aws ec2 describe-instances \
     --query 'Reservations[0].Instances[0].PublicIpAddress' \
     --output text)
 
-SSH_CMD="ssh -i ${SCRIPT_DIR}/${KEY_NAME}.pem $SSH_OPTS ec2-user@$PUBLIC_IP"
+SSH_CMD="ssh -i ${REPO_DIR}/${KEY_NAME}.pem $SSH_OPTS ec2-user@$PUBLIC_IP"
 
 echo "=== Stopping Minecraft Server ==="
 
@@ -58,7 +58,7 @@ echo "Backing up world..."
 $SSH_CMD "cd /opt/minecraft && sudo tar czf /tmp/world.tar.gz server/"
 
 mkdir -p "$BACKUP_DIR"
-scp -i "${SCRIPT_DIR}/${KEY_NAME}.pem" $SSH_OPTS \
+scp -i "${REPO_DIR}/${KEY_NAME}.pem" $SSH_OPTS \
     "ec2-user@$PUBLIC_IP:/tmp/world.tar.gz" \
     "$BACKUP_DIR/world.tar.gz"
 
