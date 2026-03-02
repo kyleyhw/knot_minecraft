@@ -3,7 +3,10 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
+BACKUP_FILE="$REPO_DIR/backups/world.tar.gz"
+SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10"
 
 if [[ ! -f "$ENV_FILE" ]]; then
     echo "ERROR: .env not found. Run setup.sh first."
@@ -26,6 +29,25 @@ if [[ -n "${INSTANCE_ID:-}" ]]; then
 fi
 
 echo "=== Starting Minecraft Server ==="
+
+# --- Create ephemeral EBS volume if needed ---
+if [[ -z "${VOLUME_ID:-}" ]]; then
+    echo "Creating 10GB EBS volume in $AZ..."
+    VOLUME_ID=$(aws ec2 create-volume \
+        --region "$REGION" \
+        --availability-zone "$AZ" \
+        --size 10 \
+        --volume-type gp3 \
+        --tag-specifications "ResourceType=volume,Tags=[{Key=Name,Value=minecraft-world}]" \
+        --query 'VolumeId' \
+        --output text)
+    echo "  Volume: $VOLUME_ID"
+
+    echo "  Waiting for volume to become available..."
+    aws ec2 wait volume-available --region "$REGION" --volume-ids "$VOLUME_ID"
+
+    sed -i "s/^VOLUME_ID=.*/VOLUME_ID=$VOLUME_ID/" "$ENV_FILE"
+fi
 
 # --- Resolve latest Amazon Linux 2023 AMI ---
 echo "Looking up latest Amazon Linux 2023 AMI..."
@@ -87,11 +109,11 @@ BOOT
 )
 
 # --- Launch spot instance ---
-echo "Requesting spot instance (m7i-flex.large, 8GB RAM)..."
+echo "Requesting spot instance (c7i-flex.large, 4GB RAM)..."
 INSTANCE_ID=$(aws ec2 run-instances \
     --region "$REGION" \
     --image-id "$AMI_ID" \
-    --instance-type m7i-flex.large \
+    --instance-type c7i-flex.large \
     --key-name "$KEY_NAME" \
     --security-group-ids "$SG_ID" \
     --placement "AvailabilityZone=$AZ" \
@@ -125,12 +147,72 @@ PUBLIC_IP=$(aws ec2 describe-instances \
     --query 'Reservations[0].Instances[0].PublicIpAddress' \
     --output text)
 
+# --- Auto-restore from backup if available ---
+if [[ -f "$BACKUP_FILE" ]]; then
+    echo ""
+    echo "Backup found — restoring world..."
+
+    SSH_CMD="ssh -i ${SCRIPT_DIR}/${KEY_NAME}.pem $SSH_OPTS ec2-user@$PUBLIC_IP"
+
+    # Wait for SSH to be ready
+    echo "  Waiting for SSH..."
+    for i in {1..30}; do
+        if $SSH_CMD "echo ok" &>/dev/null; then
+            break
+        fi
+        if [[ $i -eq 30 ]]; then
+            echo "  WARNING: Timed out waiting for SSH. Server will start without restore."
+            echo "  You can manually restore later with: bash infra/restore.sh"
+            PUBLIC_IP_DISPLAY="$PUBLIC_IP"
+            # Skip restore but continue
+            break
+        fi
+        sleep 5
+    done
+
+    # Wait for user data to mount the volume
+    echo "  Waiting for volume to mount..."
+    for i in {1..30}; do
+        if $SSH_CMD "mountpoint -q /opt/minecraft" &>/dev/null; then
+            break
+        fi
+        if [[ $i -eq 30 ]]; then
+            echo "  WARNING: Volume not mounted yet. Server may start without restore."
+            break
+        fi
+        sleep 5
+    done
+
+    # Stop Minecraft if user data already started it
+    $SSH_CMD "sudo screen -S minecraft -p 0 -X stuff 'stop\n'" 2>/dev/null || true
+    sleep 5
+
+    # Upload and extract backup
+    echo "  Uploading backup..."
+    scp -i "${SCRIPT_DIR}/${KEY_NAME}.pem" $SSH_OPTS \
+        "$BACKUP_FILE" \
+        "ec2-user@$PUBLIC_IP:/tmp/world.tar.gz"
+
+    echo "  Extracting backup..."
+    $SSH_CMD "cd /opt/minecraft && sudo rm -rf server/ && sudo tar xzf /tmp/world.tar.gz && sudo rm -f /tmp/world.tar.gz"
+
+    # Restart Minecraft with the restored world
+    echo "  Starting Minecraft with restored world..."
+    $SSH_CMD "cd /opt/minecraft/server && sudo screen -dmS minecraft java -Xmx3G -Xms3G -jar server.jar nogui"
+
+    echo "  World restored successfully."
+fi
+
 echo ""
 echo "=== Server launching ==="
 echo "Instance:  $INSTANCE_ID"
 echo "Public IP: $PUBLIC_IP"
 echo "Connect:   $PUBLIC_IP:25565"
 echo ""
-echo "The server needs 2-3 minutes to install Java and start Minecraft."
+if [[ -f "$BACKUP_FILE" ]]; then
+    echo "World restored from backup — server is ready in ~1 minute."
+else
+    echo "Fresh server — needs 2-3 minutes to install Java and start Minecraft."
+fi
 echo "SSH:       ssh -i ${KEY_NAME}.pem ec2-user@$PUBLIC_IP"
 echo "Console:   ssh in, then: sudo screen -r minecraft"

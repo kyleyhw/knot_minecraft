@@ -6,7 +6,6 @@ REGION="eu-west-2"
 AZ="${REGION}a"
 KEY_NAME="minecraft-server-key"
 SG_NAME="minecraft-server-sg"
-VOLUME_SIZE=10 # GB, plenty for a casual world
 
 if [[ -f "$ENV_FILE" ]]; then
     echo "ERROR: .env already exists at $ENV_FILE"
@@ -46,21 +45,6 @@ aws ec2 authorize-security-group-ingress \
     > /dev/null
 echo "  Security group: $SG_ID"
 
-# --- EBS Volume ---
-echo "Creating ${VOLUME_SIZE}GB EBS volume in $AZ..."
-VOLUME_ID=$(aws ec2 create-volume \
-    --region "$REGION" \
-    --availability-zone "$AZ" \
-    --size "$VOLUME_SIZE" \
-    --volume-type gp3 \
-    --tag-specifications "ResourceType=volume,Tags=[{Key=Name,Value=minecraft-world}]" \
-    --query 'VolumeId' \
-    --output text)
-echo "  Volume: $VOLUME_ID"
-
-echo "  Waiting for volume to become available..."
-aws ec2 wait volume-available --region "$REGION" --volume-ids "$VOLUME_ID"
-
 # --- Save resource IDs ---
 cat > "$ENV_FILE" <<EOF
 export AWS_PROFILE=minecraft
@@ -68,7 +52,7 @@ REGION=$REGION
 AZ=$AZ
 KEY_NAME=$KEY_NAME
 SG_ID=$SG_ID
-VOLUME_ID=$VOLUME_ID
+VOLUME_ID=
 INSTANCE_ID=
 EOF
 
